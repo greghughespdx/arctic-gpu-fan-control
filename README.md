@@ -10,6 +10,8 @@ channel of an ARCTIC Fan Controller. It smooths the measured temperatures,
 anticipates where temperature is heading, limits how fast fan speed may change, 
 and goes to full speed on any error.
 
+Includes an option to send fan data to a [GPU-Hot](https://github.com/psalias2006/gpu-hot) dashboard (see below).
+
 ## Driver requirement (note: read this first)
 
 The fan controller needs a kernel driver, `arctic_fan_controller`, which
