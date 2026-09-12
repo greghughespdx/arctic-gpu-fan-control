@@ -1,6 +1,6 @@
 # arctic-gpu-fan-control
 
-Uses an [ARCTIC fan controller](https://www.arctic.de/us/Fan-Controller/ACFAN00351A) to drive blowers/fans based on GPU temperatures on 
+Uses an [ARCTIC fan controller](https://www.arctic.de/us/Fan-Controller/ACFAN00351A) to drive blowers/fan speeds based on GPU temperatures on 
 Linux. Built for passive server GPUs that have no fan of their own and sit in a 
 chassis where the BIOS fan controls cannot effectively meet the cooling needs.
 
