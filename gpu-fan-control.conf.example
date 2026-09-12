@@ -1,0 +1,108 @@
+# gpu-fan-control example configuration.
+#
+# Copy to /etc/gpu-fan-control.conf and edit. Every value here is read at
+# startup; nothing in the Python needs changing to tune the behaviour.
+# Restart the service after an edit: systemctl restart gpu-fan-control
+#
+# The PCI addresses and channel numbers below are PLACEHOLDERS. Replace them
+# with your own (see "Mapping a GPU to a fan channel" in README.md).
+
+[loop]
+# Seconds between samples. Short on purpose: the derivative term needs a fast
+# enough sample rate to mean anything. One sample per second costs almost
+# nothing, it is a handful of small sysfs reads and one USB report.
+interval = 1.0
+
+# Seconds between journal lines. The loop runs at 1 Hz; it does not log at
+# 1 Hz. Set this lower while tuning, higher once you are happy.
+log_every = 30
+
+# How many times to retry a PWM write before treating it as fatal. A fatal
+# write failure sends every channel to full speed and exits.
+write_retries = 3
+
+[defaults]
+# Everything in this section applies to every channel. Any key can be
+# overridden inside an individual [channel:*] section.
+
+# Control temperature = max(edge, junction - junction_offset).
+# Under load the junction (hot spot) sensor typically sits 10 to 20 C above
+# the edge sensor. Subtracting this offset puts both sensors on a common
+# scale, so whichever one is closer to its own limit drives the fans. That is
+# what stops a junction spike from being invisible to the curve.
+junction_offset = 15
+
+# The curve: control temperature in C to PWM (0-255). Piecewise linear between
+# the points, flat outside the ends, so the mapping is smooth across the whole
+# range with no cliff between quiet and loud. At least two points are required.
+#
+# Anchor these on your own measurements. Run the card at its normal sustained
+# load, set a fixed PWM, wait for the temperature to settle, and write down the
+# pair. Do that at two or three PWM values and you have the shape of the curve.
+curve = 25:60, 35:70, 45:100, 50:130, 55:165, 60:200, 65:235, 70:255
+
+# Hard floor and ceiling on the PWM output, applied after the curve, the
+# derivative term and the integral term. pwm_min exists because passive cards
+# need some airflow at all times; set it to the lowest speed that still moves
+# air through the shroud.
+pwm_min = 90
+pwm_max = 255
+
+# Low-pass filter on the control temperature, in seconds (a first-order time
+# constant). An inference or training load makes the temperature saw-tooth by
+# several degrees every ten to fifteen seconds as the job pauses between
+# iterations. Without this filter both the curve and the derivative chase that
+# sawtooth and the fans audibly pump up and down. A sustained load step
+# survives the filter; a twelve second blip does not.
+# Set to 0 to disable filtering.
+smoothing_tau = 25
+
+# Anticipation. kd is PWM per (degree C per second) of the smoothed
+# temperature. With kd = 45, a 0.6 C/s rise adds about 27 PWM before the curve
+# has caught up, and a fast fall lets the fans ease down early instead of
+# waiting for the temperature to arrive.
+kd = 45
+
+# The slope is a least-squares fit over this many samples. At interval = 1.0,
+# 20 samples is a 20 second window. Fewer samples means a twitchier derivative.
+derivative_samples = 20
+
+# Steady-state trim (integral term). Off by default. Turn it on only if a soak
+# run shows the card settling above target with the curve alone; the right fix
+# is usually a better curve. target is used only by this term, and
+# integral_limit caps how much PWM the integral is allowed to contribute.
+ki = 0
+target = 55
+integral_limit = 40
+
+# Rate limiting, PWM per second, so speed changes are gradual in both
+# directions. Up is faster than down on purpose: catch a load step quickly,
+# come back down slowly enough that nobody notices a drop.
+slew_up = 12
+slew_down = 5
+
+# Hold the current speed if the new request is within this many PWM of where
+# the fan already is. Stops one-PWM dithering.
+dead_band = 3
+
+# One [channel:NAME] section per fan. NAME is free text and appears in the log.
+#
+#   channel   the ARCTIC controller channel number, 1 to 10. This is the N in
+#             the pwmN and fanN_input files under the arctic_fan hwmon
+#             directory.
+#   pci_id    the PCI address of the GPU this fan cools, in the form used
+#             under /sys/bus/pci/devices. Find it with lspci -D.
+#   label     optional short name used in the log line. Defaults to pci_id.
+#
+# Any [defaults] key can also be set here to override it for this fan only,
+# for example a different curve for a card with a different thermal limit.
+
+[channel:blower1]
+channel = 1
+pci_id = 0000:00:00.0
+label = card-a
+
+[channel:blower2]
+channel = 2
+pci_id = 0000:00:00.1
+label = card-b

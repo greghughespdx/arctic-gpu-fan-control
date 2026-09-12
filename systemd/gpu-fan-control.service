@@ -1,0 +1,25 @@
+[Unit]
+Description=GPU fan control (ARCTIC Fan Controller blowers driven by GPU temperature)
+After=multi-user.target
+Wants=multi-user.target
+# If it keeps failing, systemd must not give up: without this loop running,
+# something has to put the fans back to full speed on every attempt.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Wait for the GPUs and the ARCTIC controller to exist before starting.
+# The loop cannot control anything until both are present, and until it starts
+# the fans sit at the controller's power-up default with the BIOS full-speed
+# settings underneath.
+ExecStartPre=/usr/local/bin/gpu-fan-control-wait.sh
+ExecStart=/usr/bin/python3 /usr/local/bin/gpu-fan-control.py
+# Full speed whenever this service is not driving the fans.
+ExecStopPost=/usr/local/bin/gpu-fan-full-speed.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
